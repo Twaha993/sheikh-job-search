@@ -1,0 +1,73 @@
+name: 🤖 Sheikh's Automated Job Search
+
+on:
+  schedule:
+    # Run at 9:00 AM IST (3:30 UTC)
+    - cron: '30 3 * * *'
+    # Run at 6:00 PM IST (12:30 UTC)
+    - cron: '30 12 * * *'
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  automated-job-search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: ✅ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📥 Install dependencies
+        run: npm install
+
+      - name: 🤖 Run Sheikh's Job Search
+        env:
+          # Your API Key (required - add to GitHub Secrets)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Gmail App Password (optional - for email sending)
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: node sheikh-automated-system.js
+
+      - name: 📊 Save results
+        if: always()
+        run: |
+          git config user.name "Job Search Bot"
+          git config user.email "actions@github.com"
+          if [ -f "applications-sheikh.json" ]; then
+            git add applications-sheikh.json
+            git commit -m "📊 Job applications tracked - $(date +'%Y-%m-%d %H:%M')" || true
+            git push
+          fi
+
+      - name: 📬 Send completion notification
+        if: always()
+        run: |
+          echo "✅ Job search completed at $(date)"
+          echo "Check your email for the daily report"
+
+      - name: 🔔 Notify on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.GMAIL_USER }}
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "⚠️ Sheikh's Job Search - Error Alert"
+          to: sheikhtwaha@gmail.com
+          from: ${{ secrets.GMAIL_USER }}
+          body: |
+            The automated job search encountered an error.
+            
+            Time: $(date)
+            Run: ${{ github.run_id }}
+            Repository: ${{ github.repository }}
+            
+            Check GitHub Actions logs for details.
