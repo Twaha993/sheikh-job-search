@@ -1,0 +1,12 @@
+{
+  "name": "sheikh-job-search",
+  "version": "1.0.0",
+  "private": true,
+  "main": "sheikh-automated-system.js",
+  "scripts": {
+    "start": "node sheikh-automated-system.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.13"
+  }
+}
