@@ -1,11 +1,7 @@
 /**
- * Sheikh's Daily Job Alert System
- * Pulls REAL jobs from Remotive's free public API, filters to your roles,
- * and emails you a formatted digest with apply links.
- *
- * - No API key needed for job data
- * - No scraping (uses official public API)
- * - Compliant: links back to Remotive and credits the source
+ * Sheikh's Daily Job Alert System  (widened)
+ * Pulls REAL jobs from Remotive's free public API, matches a broad set of
+ * roles, EXCLUDES India-restricted listings, and emails a digest with links.
  */
 
 const https = require('https');
@@ -16,17 +12,23 @@ const CONFIG = {
   emailFrom: process.env.GMAIL_USER || 'sheikhtwaha@gmail.com',
   gmailAppPassword: process.env.GMAIL_APP_PASSWORD || '',
 
-  // Matched against the job TITLE (case-insensitive, partial match)
   keywords: [
-    'data center', 'datacenter', 'data centre',
-    'business development', 'bizdev',
-    'consulting', 'consultant',
-    'program manager', 'programme manager', 'program management',
-    'strategy', 'strategic', 'infrastructure', 'partnerships',
-    'operations', 'gtm', 'go-to-market'
+    'data center', 'datacenter', 'data centre', 'colocation', 'hyperscale',
+    'infrastructure', 'cloud', 'gpu', 'compute', 'network',
+    'business development', 'biz dev', 'bizdev', 'commercial', 'go-to-market',
+    'gtm', 'growth', 'partnerships', 'partner', 'alliances', 'alliance',
+    'sales', 'account executive', 'account manager', 'account director', 'key account',
+    'consulting', 'consultant', 'advisory', 'advisor', 'strategy', 'strategic',
+    'corporate development', 'transformation',
+    'program manager', 'programme manager', 'program management', 'project manager',
+    'project management', 'portfolio', 'pmo',
+    'operations', 'procurement', 'vendor', 'sourcing',
+    'vice president', 'vp ', 'head of', 'chief', 'director', 'manager', 'lead', 'principal'
   ],
 
-  maxJobsInEmail: 30
+  excludeLocations: ['india'],
+
+  maxJobsInEmail: 40
 };
 
 function getJSON(url) {
@@ -47,13 +49,17 @@ function matchesKeyword(title) {
   return CONFIG.keywords.some((k) => t.includes(k));
 }
 
+function isExcludedLocation(loc) {
+  const l = (loc || '').toLowerCase();
+  return CONFIG.excludeLocations.some((x) => l.includes(x));
+}
+
 async function fetchJobs() {
-  // One call, sorted by newest. Stays well under Remotive's rate limits.
   const json = await getJSON('https://remotive.com/api/remote-jobs?limit=500');
   const jobs = (json && json.jobs) || [];
   const matched = [];
   for (const j of jobs) {
-    if (matchesKeyword(j.title)) {
+    if (matchesKeyword(j.title) && !isExcludedLocation(j.candidate_required_location)) {
       matched.push({
         title: j.title,
         company: j.company_name,
@@ -86,8 +92,7 @@ function buildHtml(jobs) {
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:740px;margin:0 auto;">
     <h2 style="color:#1a4d8f;margin-bottom:4px;">Your Daily Job Matches</h2>
     <p style="color:#777;margin-top:0;">${today}</p>
-    <p style="color:#555;">${jobs.length} role(s) matching data center strategy, business development,
-       consulting, program management &amp; related. Click a title to view and apply.</p>
+    <p style="color:#555;">${jobs.length} role(s) matched (India-based roles excluded). Click a title to view and apply.</p>
     <table style="width:100%;border-collapse:collapse;font-size:14px;">
       <thead>
         <tr style="background:#f4f6f9;text-align:left;">
@@ -128,7 +133,7 @@ async function sendEmail(jobs) {
 async function main() {
   console.log('Fetching real jobs from Remotive...');
   let jobs = await fetchJobs();
-  console.log(`Matched ${jobs.length} jobs to your keywords.`);
+  console.log(`Matched ${jobs.length} jobs (after excluding India).`);
   jobs = jobs.slice(0, CONFIG.maxJobsInEmail);
   if (jobs.length === 0) {
     console.log('No matches today — no email sent.');
